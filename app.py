@@ -42,7 +42,7 @@ st.markdown("""
 # Load data
 @st.cache_data
 def load_data():
-    df = pd.read_csv('~/reddit_ai_cleaned.csv')
+    df = pd.read_csv('data/reddit_ai_cleaned.csv')
     df['created_datetime'] = pd.to_datetime(df['created_datetime'])
     df['date'] = pd.to_datetime(df['date'])
     return df

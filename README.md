@@ -34,15 +34,14 @@ streamlit run app.py
 ```
 ├── README.md
 ├── app.py                       # Main Streamlit application
-├── data_collection/             # Data files
-├── notebooks/                   # Jupyter notebooks for analysis
-└── reddit_ai_cleaned.csv        # final, cleaned data file used by notebooks and streamlit app              
+├── data/                        # Scraping and data files
+├── notebooks/                   # Jupyter notebooks for analysis            
 ├── requirements.txt             # Python dependencies
 └── .gitignore
 ```
 
 ### Author
-*This project was created by Archisha Bhatt as part of the prject for CMSE 830 Foundations of Data Science.*
+*This project was created by Archisha Bhatt as part of the midsemester project for CMSE 830 Foundations of Data Science.*
 
 # Acknowledgements
 I would like to thank Dr. Luciano Silvesitri and the Teaching Assistant Saraswathi Baskaran for all their help and guidance throughout the semester.

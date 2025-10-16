@@ -1,6 +1,6 @@
-# AI Sentiment Analysis
+# **AI Sentiment Analysis**
 
-### Project Overview
+## Project Overview
 This Github Repository includes the (Python) code to scrape, clean and analyze data sourced from Reddit, which focus on opinionated text on Artificial Intelligence. The project aims to apply natural language processing methods on posts made by users from various subreddits.
 
 Essential features of the project:
@@ -10,7 +10,7 @@ Essential features of the project:
 - Streamlit App
 - Github Repository
 
-### Installation
+## Installation
 
 To clone the repository:
 
@@ -30,7 +30,7 @@ To run the Streamlit app, execute the following command:
 streamlit run app.py
 ```
 
-### Project Guide and Organization
+## Project Guide and Organization
 ```
 ├── README.md
 ├── app.py                       # Main Streamlit application
@@ -40,8 +40,8 @@ streamlit run app.py
 └── .gitignore
 ```
 
-### Author
+## Author
 *This project was created by Archisha Bhatt as part of the midsemester project for CMSE 830 Foundations of Data Science.*
 
-# Acknowledgements
+## Acknowledgements
 I would like to thank Dr. Luciano Silvesitri and the Teaching Assistant Saraswathi Baskaran for all their help and guidance throughout the semester.

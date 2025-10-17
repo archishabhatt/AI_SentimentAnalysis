@@ -161,7 +161,7 @@ if page == "📖 Data Overview":
         paper_bgcolor='white'
     )
     fig.update_coloraxes(showscale=False)
-    st.plotly_chart(fig, use_container_width=True)
+    sst.plotly_chart(fig, width='stretch')
     
     st.markdown("")
     
@@ -214,7 +214,7 @@ elif page == "📈 Sentiment Analysis":
         paper_bgcolor='white',
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
     
     st.markdown("")
     
@@ -239,7 +239,7 @@ elif page == "📈 Sentiment Analysis":
             plot_bgcolor='white',
             paper_bgcolor='white'
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Insights
         positive_pct = (filtered_df['sentiment_polarity'] > 0).mean() * 100
@@ -265,7 +265,7 @@ elif page == "📈 Sentiment Analysis":
             plot_bgcolor='white',
             paper_bgcolor='white'
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Insights
         avg_subj = filtered_df['sentiment_subjectivity'].mean()
@@ -298,7 +298,7 @@ elif page == "📈 Sentiment Analysis":
         plot_bgcolor='white',
         paper_bgcolor='white'
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
     
     st.markdown("")
     
@@ -320,7 +320,7 @@ elif page == "📈 Sentiment Analysis":
         plot_bgcolor='white',
         paper_bgcolor='white'
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 # ===== ENGAGEMENT PATTERNS PAGE =====
 elif page == "💬 Engagement Patterns":
@@ -350,7 +350,7 @@ elif page == "💬 Engagement Patterns":
         plot_bgcolor='white',
         paper_bgcolor='white'
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
     
     # Peak activity
     peak_day = posts_per_day.loc[posts_per_day['count'].idxmax()]
@@ -379,7 +379,7 @@ elif page == "💬 Engagement Patterns":
             plot_bgcolor='white',
             paper_bgcolor='white'
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Correlation
         corr = filtered_df[['score', 'num_comments']].corr().iloc[0, 1]
@@ -403,7 +403,7 @@ elif page == "💬 Engagement Patterns":
             plot_bgcolor='white',
             paper_bgcolor='white'
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Correlation
         corr = filtered_df[['post_length', 'score']].corr().iloc[0, 1]
@@ -445,7 +445,7 @@ elif page == "💬 Engagement Patterns":
         plot_bgcolor='white',
         paper_bgcolor='white'
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 # ===== TEXT ANALYSIS PAGE =====
 elif page == "☁️ Text Analysis":
@@ -538,7 +538,7 @@ elif page == "☁️ Text Analysis":
             paper_bgcolor='white'
         )
         fig.update_coloraxes(showscale=False)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 # Footer
 st.sidebar.markdown("---")

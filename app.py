@@ -161,7 +161,7 @@ if page == "📖 Data Overview":
         paper_bgcolor='white'
     )
     fig.update_coloraxes(showscale=False)
-    sst.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, width='stretch')
     
     st.markdown("")
     

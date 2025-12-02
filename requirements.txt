@@ -11,3 +11,5 @@ nltk
 textblob
 transformers
 statsmodels
+umap-learn
+sentence-transformers

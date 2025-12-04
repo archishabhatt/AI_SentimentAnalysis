@@ -23,7 +23,7 @@ warnings.filterwarnings('ignore')
 
 # Page config
 st.set_page_config(
-    page_title="🤖 AI Sentiment Analysis Dashboard",
+    page_title="AI Sentiment Analysis Dashboard",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -105,8 +105,8 @@ st.markdown("""
 
 # Color scheme
 COLORS = {
-    'reddit': '#FF5700',
-    'youtube': '#FF0000',
+    'reddit': "#EFE74C",
+    'youtube': "#66B7D4",
     'positive': '#2ecc71',
     'negative': '#e74c3c',
     'neutral': '#95a5a6',

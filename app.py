@@ -22,7 +22,7 @@ warnings.filterwarnings('ignore')
 
 # Page config
 st.set_page_config(
-    page_title="🤖 AI Sentiment Analysis Dashboard",
+    page_title="AI Sentiment Analysis Dashboard",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"

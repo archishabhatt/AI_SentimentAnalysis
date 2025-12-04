@@ -6,11 +6,11 @@ from textblob import TextBlob
 
 # --- Reddit API credentials ---
 reddit = praw.Reddit(
-    client_id="ZJsFu16c3va0C51kYDtEuw",
-    client_secret="VIUps0dC9u3n1DBltprGqJQOwM8daA",
-    username="desultoryphilosopher",
-    password="Archisha@123",
-    user_agent="AI scraper by /u/desultoryphilosopher"
+    # client_id="insert id here",
+    #client_secret= "insert secret here",
+    #username="insert username here",
+    #password="insert password here",
+    #user_agent="insert user agent here"
 )
 
 # --- Subreddits to scrape ---

@@ -16,6 +16,7 @@ from sklearn.svm import LinearSVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, accuracy_score, f1_score, precision_score, recall_score
 import seaborn as sns
+from sentence_transformers import SentenceTransformer
 import re
 import warnings
 warnings.filterwarnings('ignore')
@@ -73,14 +74,6 @@ st.markdown("""
         margin: 20px 0;
         border-left: 5px solid #2ecc71;
     }
-    .warning-box {
-        background-color: #fff3cd;
-        border: 1px solid #ffc107;
-        color: #856404;
-        padding: 12px;
-        border-radius: 5px;
-        margin: 10px 0;
-    }
     .model-section {
         background-color: white;
         padding: 20px;
@@ -99,17 +92,25 @@ st.markdown("""
     .tab-content {
         padding: 20px 0;
     }
+    .sampling-warning {
+        background-color: #fff3cd;
+        border: 1px solid #ffc107;
+        color: #856404;
+        padding: 12px;
+        border-radius: 5px;
+        margin: 10px 0;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # Color scheme
 COLORS = {
-    'reddit': '#FF5700',
-    'youtube': '#FF0000',
+    'reddit': "#5FC1DC",
+    'youtube': "#46198E",
     'positive': '#2ecc71',
     'negative': '#e74c3c',
-    'neutral': '#95a5a6',
-    'primary': '#3498db',
+    'neutral': "#7a8282",
+    'primary': "#65bd4c",
     'secondary': '#9b59b6',
     'success': '#27ae60',
     'warning': '#f39c12'
@@ -156,19 +157,15 @@ def load_data():
 
 df = load_data()
 
-# Initialize BERT model with error handling
-bert_model = None
-bert_available = False
+# Initialize BERT model (cached)
+@st.cache_resource
+def load_bert_model():
+    try:
+        return SentenceTransformer("all-MiniLM-L6-v2")
+    except:
+        return None
 
-try:
-    with st.spinner("Loading BERT model (first time may take a minute)..."):
-        from sentence_transformers import SentenceTransformer
-        bert_model = SentenceTransformer("all-MiniLM-L6-v2", device='cpu')
-        bert_available = True
-        st.success("✅ BERT model loaded successfully!")
-except Exception as e:
-    st.warning(f"⚠️ BERT model could not be loaded: {e}")
-    st.info("Traditional ML models will still work. BERT features will be disabled.")
+bert_model = load_bert_model()
 
 # Sidebar Navigation
 st.sidebar.title("🤖 AI Sentiment Dashboard")
@@ -176,7 +173,6 @@ st.sidebar.markdown("---")
 
 # Project Info in Sidebar
 with st.sidebar.expander("📚 Project Overview"):
-    bert_status = "✅ Available" if bert_available else "❌ Disabled (loading issues)"
     st.markdown(f"""
     **Project Goal**: Analyze public sentiment about AI from Reddit and YouTube comments
     
@@ -188,20 +184,14 @@ with st.sidebar.expander("📚 Project Overview"):
     
     **Total Comments**: {len(df):,}
     
-    **BERT Status**: {bert_status}
-    
     **Modeling Note**: Using {MODEL_SAMPLE_SIZE} random samples for faster model training
     """)
 
-# Define pages based on BERT availability
-if bert_available:
-    pages = ["🏠 Project Overview", "📊 Data Explorer", "📈 EDA Dashboard", 
-             "🤖 Traditional ML Models", "🧠 BERT Models", "📋 Model Comparison"]
-else:
-    pages = ["🏠 Project Overview", "📊 Data Explorer", "📈 EDA Dashboard", 
-             "🤖 Traditional ML Models", "📋 Model Comparison"]
-
-page = st.sidebar.radio("Navigate to:", pages)
+page = st.sidebar.radio(
+    "Navigate to:",
+    ["🏠 Project Overview", "📊 Data Explorer", "📈 EDA Dashboard", 
+     "🤖 Traditional ML Models", "🧠 BERT Models", "📋 Model Comparison"]
+)
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔍 Data Filters")
@@ -374,6 +364,24 @@ if page == "🏠 Project Overview":
     
     for step, description in pipeline_steps:
         st.markdown(f"**{step}** — {description}")
+    
+    # Tech Stack
+    st.subheader("🛠️ Technology Stack")
+    
+    tech_cols = st.columns(3)
+    tech_stacks = [
+        ("Data Processing", "Pandas, NumPy, Scikit-learn"),
+        ("Visualization", "Plotly, Matplotlib, Seaborn"),
+        ("NLP", "NLTK, TF-IDF, Sentence Transformers"),
+        ("ML Models", "Logistic Regression, Random Forest, BERT"),
+        ("Web App", "Streamlit, Caching, Session State"),
+        ("Deployment", "Docker, Streamlit Cloud")
+    ]
+    
+    for col, (category, tools) in zip(tech_cols * 2, tech_stacks):
+        with col:
+            st.markdown(f"**{category}**")
+            st.markdown(f"`{tools}`")
 
 # ===== DATA EXPLORER PAGE =====
 elif page == "📊 Data Explorer":
@@ -384,6 +392,9 @@ elif page == "📊 Data Explorer":
     if filtered_df.empty:
         st.warning("No data available. Please check data loading.")
         st.stop()
+    
+    # Sampling control for EDA
+    st.markdown('<div class="sampling-warning">⚠️ Showing full dataset for exploration. Modeling sections use smaller samples for speed.</div>', unsafe_allow_html=True)
     
     # Search functionality
     col1, col2 = st.columns([3, 1])
@@ -470,7 +481,7 @@ elif page == "📈 EDA Dashboard":
     eda_sample_size = min(EDA_SAMPLE_SIZE, len(filtered_df))
     eda_df = filtered_df.sample(eda_sample_size, random_state=42) if len(filtered_df) > eda_sample_size else filtered_df
     
-    st.markdown(f'<div class="warning-box">📊 Showing {len(eda_df):,} random samples for fast visualization</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sampling-warning">📊 Showing {len(eda_df):,} random samples for fast visualization</div>', unsafe_allow_html=True)
     
     # Tab layout for different EDA sections
     tab1, tab2, tab3, tab4 = st.tabs(["📊 Distributions", "📈 Time Analysis", "🌐 Platform Comparison", "🔍 Text Analysis"])
@@ -710,7 +721,7 @@ elif page == "🤖 Traditional ML Models":
     # Get modeling sample
     model_df = get_modeling_sample(filtered_df, MODEL_SAMPLE_SIZE)
     
-    st.markdown(f'<div class="warning-box">⚡ Using {len(model_df):,} balanced samples for faster model training</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sampling-warning">⚡ Using {len(model_df):,} balanced samples for faster model training</div>', unsafe_allow_html=True)
     
     with st.expander("⚙️ Model Configuration", expanded=True):
         col1, col2, col3 = st.columns(3)
@@ -906,8 +917,8 @@ elif page == "🤖 Traditional ML Models":
     sample_df = pd.DataFrame(sample_data)
     st.dataframe(sample_df, use_container_width=True)
 
-# ===== BERT MODELS PAGE (Only if available) =====
-elif page == "🧠 BERT Models" and bert_available:
+# ===== BERT MODELS PAGE =====
+elif page == "🧠 BERT Models":
     st.title("🧠 BERT-Based Models")
     st.markdown("### Transformer-based models for advanced sentiment analysis")
     st.markdown("---")
@@ -916,11 +927,15 @@ elif page == "🧠 BERT Models" and bert_available:
         st.warning("No data available. Please check data loading.")
         st.stop()
     
+    if bert_model is None:
+        st.error("BERT model could not be loaded. Please check dependencies.")
+        st.stop()
+    
     # Get modeling sample - smaller for BERT due to computation
     bert_sample_size = min(MODEL_SAMPLE_SIZE, 500)  # Even smaller for BERT
     model_df = get_modeling_sample(filtered_df, bert_sample_size)
     
-    st.markdown(f'<div class="warning-box">⚡ Using {len(model_df):,} samples for BERT modeling (computationally intensive)</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sampling-warning">⚡ Using {len(model_df):,} samples for BERT modeling (computationally intensive)</div>', unsafe_allow_html=True)
     
     with st.expander("⚙️ BERT Model Configuration", expanded=True):
         col1, col2, col3 = st.columns(3)
@@ -971,7 +986,7 @@ elif page == "🧠 BERT Models" and bert_available:
         texts = model_df[bert_text_feature].fillna('').tolist()
         
         # Process in batches to show progress
-        batch_size = 50
+        batch_size = 100
         embeddings_list = []
         
         for i in range(0, len(texts), batch_size):
@@ -1148,7 +1163,7 @@ elif page == "📋 Model Comparison":
     # Get modeling sample
     model_df = get_modeling_sample(filtered_df, MODEL_SAMPLE_SIZE)
     
-    st.markdown(f'<div class="warning-box">⚡ Using {len(model_df):,} samples for model comparison</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sampling-warning">⚡ Using {len(model_df):,} samples for model comparison</div>', unsafe_allow_html=True)
     
     st.markdown("""
     This section compares the performance of different modeling approaches on our AI sentiment dataset.
@@ -1180,15 +1195,11 @@ elif page == "📋 Model Comparison":
             test_size = st.slider("Test Size", 0.1, 0.4, 0.2, 0.05, key="compare_test")
             random_state = st.number_input("Random State", 1, 100, 42, key="compare_random")
             
-            # Only show BERT option if available
-            model_options = ["TF-IDF + Logistic Regression", "TF-IDF + Random Forest"]
-            if bert_available:
-                model_options.append("BERT + Logistic Regression")
-            
             models_to_compare = st.multiselect(
                 "Models to Compare",
-                model_options,
-                default=["TF-IDF + Logistic Regression"] + (["BERT + Logistic Regression"] if bert_available else [])
+                ["TF-IDF + Logistic Regression", "TF-IDF + Random Forest", 
+                 "BERT + Logistic Regression"],
+                default=["TF-IDF + Logistic Regression", "BERT + Logistic Regression"]
             )
     
     if not models_to_compare:
@@ -1218,17 +1229,18 @@ elif page == "📋 Model Comparison":
                 X_tfidf, y, test_size=test_size, random_state=random_state, stratify=y if is_binary else None
             )
     
-    # Prepare BERT features if needed
-    if any("BERT" in model for model in models_to_compare) and bert_available:
+    # Prepare BERT features
+    if any("BERT" in model for model in models_to_compare):
         with st.spinner("Computing BERT embeddings (this may take a moment)..."):
-            bert_text_feature = "text_bert" if "text_bert" in model_df.columns else "text_clean"
-            texts = model_df[bert_text_feature].fillna('').tolist()
-            X_bert = bert_model.encode(texts, show_progress_bar=False, convert_to_numpy=True)
-            
-            # Split data
-            X_train_bert, X_test_bert, y_train, y_test = train_test_split(
-                X_bert, y, test_size=test_size, random_state=random_state, stratify=y if is_binary else None
-            )
+            if bert_model is not None:
+                bert_text_feature = "text_bert" if "text_bert" in model_df.columns else "text_clean"
+                texts = model_df[bert_text_feature].fillna('').tolist()
+                X_bert = bert_model.encode(texts, show_progress_bar=False, convert_to_numpy=True)
+                
+                # Split data
+                X_train_bert, X_test_bert, y_train, y_test = train_test_split(
+                    X_bert, y, test_size=test_size, random_state=random_state, stratify=y if is_binary else None
+                )
     
     # Train each model
     progress_bar = st.progress(0)
@@ -1240,9 +1252,6 @@ elif page == "📋 Model Comparison":
         if "TF-IDF" in model_name:
             X_train, X_test = X_train_tfidf, X_test_tfidf
         else:
-            if not bert_available:
-                st.warning("BERT model is not available. Skipping BERT models.")
-                continue
             X_train, X_test = X_train_bert, X_test_bert
         
         # Select classifier
@@ -1328,20 +1337,19 @@ elif page == "📋 Model Comparison":
         # Key insights
         st.subheader("🔍 Key Insights")
         
-        if len(results) > 0:
-            best_model = results_df.loc[results_df['Accuracy'].idxmax()]
-            
-            st.markdown(f"""
-            **Best Performing Model**: **{best_model['Model']}** with {best_model['Accuracy']:.3f} accuracy
-            
-            **Observations**:
-            1. **BERT models** generally perform better with complex text understanding
-            2. **TF-IDF models** are faster to train and good for baseline comparison
-            3. **Logistic Regression** often provides better interpretability
-            4. **Random Forest** can handle non-linear relationships better
-            
-            **Recommendation**: Use **{best_model['Model']}** for production if {best_model['Accuracy']:.1%} accuracy meets requirements.
-            """)
+        best_model = results_df.loc[results_df['Accuracy'].idxmax()]
+        
+        st.markdown(f"""
+        **Best Performing Model**: **{best_model['Model']}** with {best_model['Accuracy']:.3f} accuracy
+        
+        **Observations**:
+        1. **BERT models** generally perform better with complex text understanding
+        2. **TF-IDF models** are faster to train and good for baseline comparison
+        3. **Logistic Regression** often provides better interpretability
+        4. **Random Forest** can handle non-linear relationships better
+        
+        **Recommendation**: Use **{best_model['Model']}** for production if {best_model['Accuracy']:.1%} accuracy meets requirements.
+        """)
         
         # Download results
         csv = results_df.to_csv(index=False)

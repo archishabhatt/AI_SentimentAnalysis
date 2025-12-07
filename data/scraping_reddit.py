@@ -10,11 +10,11 @@ vader_analyzer = SentimentIntensityAnalyzer()
 
 # --- Reddit API credentials ---
 reddit = praw.Reddit(
-    client_id="ZJsFu16c3va0C51kYDtEuw",
-    client_secret="VIUps0dC9u3n1DBltprGqJQOwM8daA",
-    username="desultoryphilosopher",
-    password="Archisha@123",
-    user_agent="highly opinionated AI scraper by /u/desultoryphilosopher"
+    # client_id="xyz",
+    # client_secret="xyz",
+    # username="abc",
+    # password="123",
+    # user_agent="ABC"
 )
 
 # --- Subreddits to scrape ---

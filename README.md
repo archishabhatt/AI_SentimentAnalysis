@@ -35,7 +35,7 @@ streamlit run app.py
 ├── README.md
 ├── app.py                       # Main Streamlit application
 ├── data/                        # Scraping and data files
-├── notebooks/                   # Jupyter notebooks for analysis            
+├── notebooks/                   # Jupyter notebooks for cleaning, modeling and analysis            
 ├── requirements.txt             # Python dependencies
 └── .gitignore
 ```

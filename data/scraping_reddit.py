@@ -2,15 +2,19 @@ import praw
 import pandas as pd
 import time
 from datetime import datetime, timezone
-from textblob import TextBlob
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+import re
+
+# Initialize VADER
+vader_analyzer = SentimentIntensityAnalyzer()
 
 # --- Reddit API credentials ---
 reddit = praw.Reddit(
-    # client_id="insert id here",
-    #client_secret= "insert secret here",
-    #username="insert username here",
-    #password="insert password here",
-    #user_agent="insert user agent here"
+    client_id="ZJsFu16c3va0C51kYDtEuw",
+    client_secret="VIUps0dC9u3n1DBltprGqJQOwM8daA",
+    username="desultoryphilosopher",
+    password="Archisha@123",
+    user_agent="highly opinionated AI scraper by /u/desultoryphilosopher"
 )
 
 # --- Subreddits to scrape ---
@@ -23,8 +27,8 @@ subreddits = [
 # --- Scraping settings ---
 post_limit = 100
 min_comments = 5
-min_word_count = 10  # Minimum words in post+comments for good NLP
-max_word_count = 1500  # Maximum words to avoid extremely long posts
+min_word_count = 10
+max_word_count = 1500
 
 # --- Date filtering ---
 start_date = datetime(2020, 1, 1, tzinfo=timezone.utc)
@@ -70,6 +74,34 @@ def get_word_count(text):
     """Get word count of text"""
     return len(str(text).split())
 
+def get_subjectivity_score(text):
+    """
+    Calculate subjectivity using word patterns and VADER intensity.
+    Returns value between 0 (objective) and 1 (subjective).
+    """
+    text_lower = text.lower()
+    
+    # Subjective indicators
+    subjective_patterns = [
+        r'\b(i think|i believe|i feel|in my opinion|personally|seems like)\b',
+        r'\b(should|would|could|might|probably|possibly|maybe)\b',
+        r'\b(amazing|terrible|awesome|horrible|love|hate|best|worst)\b',
+        r'\b(clearly|obviously|definitely|certainly|surely)\b'
+    ]
+    
+    subjectivity_score = 0.0
+    
+    # Pattern matching (up to 0.5)
+    for pattern in subjective_patterns:
+        if re.search(pattern, text_lower):
+            subjectivity_score += 0.125
+    
+    # VADER compound score intensity (up to 0.5)
+    vader_scores = vader_analyzer.polarity_scores(text)
+    subjectivity_score += abs(vader_scores['compound']) * 0.5
+    
+    return min(subjectivity_score, 1.0)
+
 def is_relevant_post(text):
     """Check if post is relevant for our analysis"""
     word_count = get_word_count(text)
@@ -86,8 +118,8 @@ def is_relevant_post(text):
     if not (contains_opinion(text) or contains_societal(text)):
         return False
     
-    # Must be subjective enough
-    if TextBlob(text).sentiment.subjectivity < 0.3:
+    # Must be subjective enough (using our custom subjectivity measure)
+    if get_subjectivity_score(text) < 0.3:
         return False
     
     return True
@@ -114,14 +146,19 @@ def scrape_post_comments(post):
                 contains_ai(comment_text) and 
                 (contains_opinion(comment_text) or contains_societal(comment_text))):
                 
-                sentiment = TextBlob(comment_text).sentiment
+                # Get VADER sentiment scores
+                vader_scores = vader_analyzer.polarity_scores(comment_text)
+                subjectivity = get_subjectivity_score(comment_text)
                 
                 comments_data.append({
                     # --- TEXT & ANALYSIS (YouTube compatible) ---
                     "text": comment_text,
                     "comment_length": word_count,
-                    "sentiment_polarity": sentiment.polarity,
-                    "sentiment_subjectivity": sentiment.subjectivity,
+                    "sentiment_polarity": vader_scores['compound'],
+                    "sentiment_positive": vader_scores['pos'],
+                    "sentiment_negative": vader_scores['neg'],
+                    "sentiment_neutral": vader_scores['neu'],
+                    "sentiment_subjectivity": subjectivity,
                     
                     # --- ENGAGEMENT (YouTube compatible) ---
                     "likes": comment.score,
@@ -229,10 +266,13 @@ def scrape_reddit_ai_data():
 
 # --- Main execution ---
 if __name__ == "__main__":
-    print("Starting Reddit AI data scraping...")
+    print("="*60)
+    print("Reddit AI Data Scraper (VADER)")
+    print("="*60)
     print(f"Date range: {start_date.date()} to {end_date.date()}")
     print(f"Minimum word count: {min_word_count}")
     print(f"Maximum word count: {max_word_count}")
+    print("="*60)
     
     start_time = time.time()
     
@@ -243,9 +283,9 @@ if __name__ == "__main__":
     if comments_data:
         df = pd.DataFrame(comments_data)
         
-        # Add sentiment label for easier analysis
+        # Add sentiment label based on VADER compound score
         df['sentiment_label'] = df['sentiment_polarity'].apply(
-            lambda x: 'positive' if x > 0.1 else ('negative' if x < -0.1 else 'neutral')
+            lambda x: 'positive' if x >= 0.05 else ('negative' if x <= -0.05 else 'neutral')
         )
         
         # Save to CSV
@@ -264,13 +304,21 @@ if __name__ == "__main__":
         print(f"Time elapsed: {elapsed_time:.2f} seconds")
         print(f"\nSentiment distribution:")
         print(df['sentiment_label'].value_counts())
+        print(f"\nAverage sentiment scores:")
+        print(f"  Compound: {df['sentiment_polarity'].mean():.3f}")
+        print(f"  Positive: {df['sentiment_positive'].mean():.3f}")
+        print(f"  Negative: {df['sentiment_negative'].mean():.3f}")
+        print(f"  Neutral: {df['sentiment_neutral'].mean():.3f}")
         print(f"\nTop subreddits:")
         print(df['subreddit'].value_counts().head())
         print(f"\nData saved to: {output_file}")
         
         # Show sample
-        print(f"\nSample data:")
-        print(df[['text', 'sentiment_label', 'subreddit', 'comment_length']].head())
+        print(f"\nSample data (first 3 comments):")
+        for i, row in df.head(3).iterrows():
+            print(f"\n{i+1}. [{row['sentiment_label'].upper()}] {row['text'][:100]}...")
+            print(f"   Compound: {row['sentiment_polarity']:.3f} | Pos: {row['sentiment_positive']:.2f} | Neg: {row['sentiment_negative']:.2f}")
+            print(f"   Subreddit: r/{row['subreddit']}")
         
     else:
-        print("No data collected!")
+        print("\nNo data collected!")

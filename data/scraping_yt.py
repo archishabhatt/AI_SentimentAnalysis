@@ -3,7 +3,7 @@ import time
 import pandas as pd
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from textblob import TextBlob
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from datetime import datetime, timezone
 import logging
 import re
@@ -11,6 +11,9 @@ import re
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Initialize VADER
+vader_analyzer = SentimentIntensityAnalyzer()
 
 # -----------------------------
 # Configuration
@@ -66,7 +69,7 @@ end_date = "2025-12-31T23:59:59Z"
 # --- Text filtering parameters ---
 MIN_WORDS = 10
 MAX_WORDS = 300
-MIN_SENTENCES = 1  # Reduced from 2 to be less strict
+MIN_SENTENCES = 1
 
 def clean_text(text):
     """Clean and normalize text"""
@@ -85,16 +88,42 @@ def get_word_count(text):
     """Get word count of text"""
     return len(str(text).split())
 
+def get_subjectivity_score(text):
+    """
+    Calculate subjectivity using word patterns and VADER intensity.
+    Returns value between 0 (objective) and 1 (subjective).
+    """
+    text_lower = text.lower()
+    
+    # Subjective indicators
+    subjective_patterns = [
+        r'\b(i think|i believe|i feel|in my opinion|personally|seems like)\b',
+        r'\b(should|would|could|might|probably|possibly|maybe)\b',
+        r'\b(amazing|terrible|awesome|horrible|love|hate|best|worst)\b',
+        r'\b(clearly|obviously|definitely|certainly|surely)\b'
+    ]
+    
+    subjectivity_score = 0.0
+    
+    # Pattern matching (up to 0.5)
+    for pattern in subjective_patterns:
+        if re.search(pattern, text_lower):
+            subjectivity_score += 0.125
+    
+    # VADER compound score intensity (up to 0.5)
+    vader_scores = vader_analyzer.polarity_scores(text)
+    subjectivity_score += abs(vader_scores['compound']) * 0.5
+    
+    return min(subjectivity_score, 1.0)
+
 def contains_any_keyword(text, keywords):
     """Check if text contains any of the keywords (flexible matching)"""
     text_lower = text.lower()
     for keyword in keywords:
-        # For multi-word keywords, check if all words appear (not necessarily as phrase)
         if ' ' in keyword:
             words = keyword.split()
             if all(word in text_lower for word in words):
                 return True
-        # For single word keywords
         elif keyword.lower() in text_lower:
             return True
     return False
@@ -124,7 +153,6 @@ def contains_ai_keywords(text):
 
     return False
 
-
 def is_relevant_comment(text):
     """Check if comment is relevant for analysis"""
     # Clean text first
@@ -141,7 +169,7 @@ def is_relevant_comment(text):
     if len(valid_sentences) < MIN_SENTENCES:
         return False
     
-    # Must contain AI keywords (more flexible check)
+    # Must contain AI keywords
     if not contains_ai_keywords(cleaned_text):
         return False
     
@@ -150,11 +178,8 @@ def is_relevant_comment(text):
             contains_any_keyword(cleaned_text, societal_keywords)):
         return False
     
-    # Must be somewhat subjective (not purely factual)
-    try:
-        if TextBlob(cleaned_text).sentiment.subjectivity < 0.15:  # Reduced threshold
-            return False
-    except:
+    # Must be somewhat subjective
+    if get_subjectivity_score(cleaned_text) < 0.15:
         return False
     
     return True
@@ -176,19 +201,15 @@ def search_videos(youtube, query, max_results=20, published_after=None, publishe
             "videoDuration": "any"
         }
         
-        # Add date filters if provided
         if published_after:
             request_params["publishedAfter"] = published_after
         if published_before:
             request_params["publishedBefore"] = published_before
         
         results = youtube.search().list(**request_params).execute()
-        
         video_ids = [item["id"]["videoId"] for item in results.get("items", [])]
         
         logger.info(f"Found {len(video_ids)} videos for query: '{query}'")
-        
-        # Return all videos, we'll filter later
         return video_ids
             
     except HttpError as e:
@@ -201,7 +222,6 @@ def search_videos(youtube, query, max_results=20, published_after=None, publishe
 def get_videos_metadata(youtube, video_ids):
     """Get metadata for multiple videos at once"""
     try:
-        # YouTube API allows up to 50 IDs per request
         chunks = [video_ids[i:i+50] for i in range(0, len(video_ids), 50)]
         all_metadata = {}
         
@@ -216,7 +236,6 @@ def get_videos_metadata(youtube, video_ids):
                 snippet = item.get("snippet", {})
                 stats = item.get("statistics", {})
                 
-                # Parse published date
                 published_at = snippet.get("publishedAt", "")
                 try:
                     pub_date = datetime.fromisoformat(published_at.replace('Z', '+00:00'))
@@ -251,9 +270,8 @@ def get_video_comments(youtube, video_id, video_meta, max_comments=100):
     max_attempts = 3
     
     try:
-        # Check if comments are enabled and have reasonable count
         comment_count = video_meta.get("video_comment_count", 0)
-        if comment_count < 5:  # Reduced threshold
+        if comment_count < 5:
             logger.info(f"Video {video_id} has only {comment_count} comments, skipping")
             return comments
         
@@ -267,31 +285,31 @@ def get_video_comments(youtube, video_id, video_meta, max_comments=100):
                     maxResults=min(100, max_comments - len(comments)),
                     pageToken=next_page_token,
                     textFormat="plainText",
-                    order="relevance"  # Get most relevant comments first
+                    order="relevance"
                 ).execute()
                 
                 for item in response.get("items", []):
                     snippet = item["snippet"]["topLevelComment"]["snippet"]
                     raw_text = snippet.get("textDisplay", "").strip()
                     
-                    # Clean text
                     cleaned_text = clean_text(raw_text)
                     
-                    # Apply relevance filters
                     if cleaned_text and is_relevant_comment(cleaned_text):
-                        
                         word_count = get_word_count(cleaned_text)
-                        try:
-                            sentiment = TextBlob(cleaned_text).sentiment
-                        except:
-                            sentiment = type('obj', (object,), {'polarity': 0.0, 'subjectivity': 0.5})()
+                        
+                        # Get VADER sentiment scores
+                        vader_scores = vader_analyzer.polarity_scores(cleaned_text)
+                        subjectivity = get_subjectivity_score(cleaned_text)
                         
                         comments.append({
                             # --- TEXT & ANALYSIS ---
                             "text": cleaned_text,
                             "comment_length": word_count,
-                            "sentiment_polarity": sentiment.polarity,
-                            "sentiment_subjectivity": sentiment.subjectivity,
+                            "sentiment_polarity": vader_scores['compound'],
+                            "sentiment_positive": vader_scores['pos'],
+                            "sentiment_negative": vader_scores['neg'],
+                            "sentiment_neutral": vader_scores['neu'],
+                            "sentiment_subjectivity": subjectivity,
                             
                             # --- ENGAGEMENT ---
                             "likes": snippet.get("likeCount", 0),
@@ -326,9 +344,8 @@ def get_video_comments(youtube, video_id, video_meta, max_comments=100):
                 if not next_page_token:
                     break
                     
-                # Rate limiting
                 time.sleep(0.1)
-                attempts = 0  # Reset attempts on success
+                attempts = 0
                 
             except HttpError as e:
                 if e.resp.status == 403 and ("commentsDisabled" in str(e) or "disabled" in str(e)):
@@ -377,9 +394,7 @@ def scrape_youtube_ai_data(queries=None, videos_per_query=3, comments_per_video=
             "LLM risks"
         ]
     
-    # Initialize YouTube service
     youtube = create_youtube_service()
-    
     all_comments = []
     total_videos_processed = 0
     
@@ -388,11 +403,10 @@ def scrape_youtube_ai_data(queries=None, videos_per_query=3, comments_per_video=
         logger.info(f"Query {query_index + 1}/{len(queries)}: '{query}'")
         logger.info(f"{'='*60}")
         
-        # Search for videos with date filtering
         video_ids = search_videos(
             youtube, 
             query, 
-            max_results=10,  # Reduced from 15
+            max_results=10,
             published_after=start_date,
             published_before=end_date
         )
@@ -401,10 +415,8 @@ def scrape_youtube_ai_data(queries=None, videos_per_query=3, comments_per_video=
             logger.warning(f"No videos found for query: {query}")
             continue
         
-        # Get metadata for all videos
         videos_metadata = get_videos_metadata(youtube, video_ids)
         
-        # Process videos
         videos_processed = 0
         for i, video_id in enumerate(video_ids):
             if videos_processed >= videos_per_query:
@@ -415,14 +427,11 @@ def scrape_youtube_ai_data(queries=None, videos_per_query=3, comments_per_video=
                 
             video_meta = videos_metadata[video_id]
             
-            # Simple filtering - just check if video has enough comments
             if video_meta.get("video_comment_count", 0) >= 10:
-                
                 logger.info(f"\nProcessing video {i+1}/{len(video_ids)}: {video_meta['video_title'][:60]}...")
                 logger.info(f"Channel: {video_meta['video_channel']}")
                 logger.info(f"Comments: {video_meta['video_comment_count']}")
                 
-                # Scrape comments
                 video_comments = get_video_comments(
                     youtube, 
                     video_id, 
@@ -434,15 +443,12 @@ def scrape_youtube_ai_data(queries=None, videos_per_query=3, comments_per_video=
                     all_comments.extend(video_comments)
                     videos_processed += 1
                     total_videos_processed += 1
-                    
                     logger.info(f"Added {len(video_comments)} comments (Total: {len(all_comments)})")
                 else:
                     logger.info(f"No relevant comments found in this video")
                 
-                # Rate limiting between videos
                 time.sleep(0.5)
         
-        # Rate limiting between queries
         if query_index < len(queries) - 1:
             time.sleep(1)
     
@@ -456,7 +462,6 @@ def test_youtube_api():
     try:
         youtube = create_youtube_service()
         
-        # Simple test search
         request = youtube.search().list(
             part="snippet",
             q="artificial intelligence",
@@ -505,13 +510,12 @@ def scrape_specific_videos(video_ids):
 # -----------------------------
 if __name__ == "__main__":
     print("="*60)
-    print("YouTube AI Comment Scraper")
+    print("YouTube AI Comment Scraper (VADER)")
     print("="*60)
     print(f"Date range: {start_date[:10]} to {end_date[:10]}")
     print(f"Comment length: {MIN_WORDS} to {MAX_WORDS} words")
     print("="*60)
     
-    # Test API first
     print("\nTesting YouTube API connection...")
     if not test_youtube_api():
         exit(1)
@@ -523,7 +527,6 @@ if __name__ == "__main__":
     start_time = time.time()
     
     try:
-        # OPTION 1: Use predefined queries
         comments_data = scrape_youtube_ai_data(
             queries=[
                 "AI bubble",
@@ -531,27 +534,24 @@ if __name__ == "__main__":
                 "AI ethics debate",
                 "artificial intelligence future",
                 "AI job impact",
-                "why is AI important"
+                "why is AI important",
                 "AI risks benefits"
             ],
             videos_per_query=5,
             comments_per_video=100
         )
         
-        # Create DataFrame
         if comments_data:
             df = pd.DataFrame(comments_data)
             
-            # Add sentiment label
+            # Add sentiment label based on VADER compound score
             df['sentiment_label'] = df['sentiment_polarity'].apply(
-                lambda x: 'positive' if x > 0.1 else ('negative' if x < -0.1 else 'neutral')
+                lambda x: 'positive' if x >= 0.05 else ('negative' if x <= -0.05 else 'neutral')
             )
             
-            # Save to CSV
             output_file = "youtube_ai.csv"
             df.to_csv(output_file, index=False, encoding='utf-8')
             
-            # Print summary
             elapsed_time = time.time() - start_time
             
             print(f"\n{'='*60}")
@@ -563,15 +563,19 @@ if __name__ == "__main__":
             print(f"Time elapsed: {elapsed_time:.2f} seconds")
             print(f"\nSentiment distribution:")
             print(df['sentiment_label'].value_counts())
+            print(f"\nAverage sentiment scores:")
+            print(f"  Compound: {df['sentiment_polarity'].mean():.3f}")
+            print(f"  Positive: {df['sentiment_positive'].mean():.3f}")
+            print(f"  Negative: {df['sentiment_negative'].mean():.3f}")
+            print(f"  Neutral: {df['sentiment_neutral'].mean():.3f}")
             print(f"\nTop channels:")
             print(df['video_channel'].value_counts().head())
             print(f"\nData saved to: {output_file}")
             
-            # Show sample
             print(f"\nSample data (first 3 comments):")
             for i, row in df.head(3).iterrows():
                 print(f"\n{i+1}. [{row['sentiment_label'].upper()}] {row['text'][:100]}...")
-                print(f"   Length: {row['comment_length']} words | Likes: {row['likes']} | Channel: {row['video_channel'][:30]}")
+                print(f"   Compound: {row['sentiment_polarity']:.3f} | Pos: {row['sentiment_positive']:.2f} | Neg: {row['sentiment_negative']:.2f}")
             
         else:
             print("\nNo relevant comments collected!")
@@ -579,13 +583,8 @@ if __name__ == "__main__":
             print("1. Try broader search queries")
             print("2. Increase videos_per_query and comments_per_video")
             print("3. Check if your API key has enough quota")
-            print("4. Try specific video IDs (uncomment OPTION 2 in code)")
             
     except Exception as e:
         logger.error(f"Fatal error: {e}")
         import traceback
         traceback.print_exc()
-        print("\nTroubleshooting tips:")
-        print("1. Check your API key: echo $YOUTUBE_API_KEY")
-        print("2. Verify API key is valid and YouTube Data API v3 is enabled")
-        print("3. Check your API quota at: https://console.cloud.google.com/apis/dashboard")
